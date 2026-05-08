@@ -152,7 +152,14 @@ export default function AIChatOverlay() {
                 value={input}
                 placeholder="Message AI Planner..."
                 onChange={handleInputChange}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && !isLoading && (input || '').trim()) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
                 disabled={isLoading}
+                autoComplete="off"
               />
               <button 
                 type="submit" 
