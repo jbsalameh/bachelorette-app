@@ -35,7 +35,7 @@ export default function Itinerary() {
   const [activeDay, setActiveDay] = useState(days[0]);
   const [expandedId, setExpandedId] = useState(null);
   const [editId, setEditId] = useState(null);
-  const [editForm, setEditForm] = useState({ time: '', title: '', desc: '' });
+  const [editForm, setEditForm] = useState({ time: '', title: '', desc: '', mapQuery: '', phone: '' });
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [newForm, setNewForm] = useState({ time: '12:00', title: '', desc: '' });
 
@@ -46,7 +46,7 @@ export default function Itinerary() {
   const startEdit = (ev, e) => {
     e.stopPropagation();
     setEditId(ev.id);
-    setEditForm({ time: ev.time, title: ev.title, desc: ev.desc });
+    setEditForm({ time: ev.time, title: ev.title, desc: ev.desc, mapQuery: ev.mapQuery || '', phone: ev.phone || '' });
   };
 
   const saveEdit = (id) => {
@@ -136,11 +136,13 @@ export default function Itinerary() {
                   {isEditing ? (
                     <div onClick={e => e.stopPropagation()}>
                       <input className="input-field" type="time" value={editForm.time} onChange={e => setEditForm({ ...editForm, time: e.target.value })} />
-                      <input className="input-field" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="Title" />
-                      <textarea className="input-field" value={editForm.desc} onChange={e => setEditForm({ ...editForm, desc: e.target.value })} rows="3" placeholder="Description" style={{ resize: 'none' }} />
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                        <button className="btn-primary" style={{ margin: 0, padding: '10px', flex: 1, fontSize: '0.95rem' }} onClick={() => saveEdit(ev.id)}>Save</button>
-                        <button className="btn-secondary" style={{ margin: 0, padding: '10px' }} onClick={() => setEditId(null)}>Cancel</button>
+                      <input className="input-field" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="Event title (with emoji 🎉)" />
+                      <textarea className="input-field" value={editForm.desc} onChange={e => setEditForm({ ...editForm, desc: e.target.value })} rows="2" placeholder="Description" style={{ resize: 'none' }} />
+                      <input className="input-field" value={editForm.mapQuery} onChange={e => setEditForm({ ...editForm, mapQuery: e.target.value })} placeholder="📍 Location (e.g. Taverna Calderai Palermo)" />
+                      <input className="input-field" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} placeholder="📞 Phone / Reservation number" />
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                        <button className="btn-primary" style={{ margin: 0, padding: '12px', flex: 1, fontSize: '0.9rem' }} onClick={() => saveEdit(ev.id)}>Save ✓</button>
+                        <button className="btn-secondary" style={{ margin: 0, padding: '12px', fontSize: '0.9rem', width: 'auto' }} onClick={() => setEditId(null)}>Cancel</button>
                       </div>
                     </div>
                   ) : (

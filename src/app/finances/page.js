@@ -340,7 +340,17 @@ export default function Finances() {
               {members.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
 
-            <label style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Split with</label>
+            <label style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--muted)', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>For who? (split between)</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{expForm.split_with.length === 0 ? 'Everyone' : `${expForm.split_with.length} selected`}</span>
+              <button
+                type="button"
+                onClick={() => setExpForm({ ...expForm, split_with: expForm.split_with.length === members.length ? [] : [...members] })}
+                style={{ background: 'none', border: 'none', color: 'var(--ocean)', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                {expForm.split_with.length === members.length ? 'Clear all' : 'Select all'}
+              </button>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
               {members.map(m => {
                 const inSplit = expForm.split_with.includes(m);
