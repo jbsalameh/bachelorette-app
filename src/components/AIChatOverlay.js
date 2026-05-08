@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useItinerary } from './ItineraryContext';
 
 export default function AIChatOverlay() {
@@ -156,7 +156,7 @@ export default function AIChatOverlay() {
               />
               <button 
                 type="submit" 
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || !(input || '').trim()}
                 style={{ 
                   background: 'linear-gradient(135deg, var(--sunset-orange), #FF5A82)', 
                   color: 'white',
@@ -167,8 +167,8 @@ export default function AIChatOverlay() {
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   fontSize: '20px', 
-                  cursor: (isLoading || !input.trim()) ? 'not-allowed' : 'pointer',
-                  opacity: (isLoading || !input.trim()) ? 0.6 : 1,
+                  cursor: (isLoading || !(input || '').trim()) ? 'not-allowed' : 'pointer',
+                  opacity: (isLoading || !(input || '').trim()) ? 0.6 : 1,
                   transition: 'transform 0.1s'
                 }}
               >
