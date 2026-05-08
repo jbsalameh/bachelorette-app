@@ -43,23 +43,12 @@ export default function Home() {
         </Link>
       </div>
       
-      <div className="glass-panel">
-        <h3 className="serif mb-3" style={{ color: 'var(--primary-blue)', textAlign: 'center' }}>The Crew (11) 🥂</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
-          {['Bride 👑', 'Maid of Honor 💖', '+ 9 Besties 👯‍♀️'].map((name, i) => (
-            <div key={i} style={{ 
-              padding: '10px 16px', 
-              backgroundColor: i === 0 ? 'var(--lemon-yellow)' : 'white', 
-              borderRadius: '20px', 
-              fontSize: '0.95rem', 
-              fontWeight: '800', 
-              color: 'var(--primary-blue)', 
-              boxShadow: '0 2px 8px rgba(0,0,0,0.05)' 
-            }}>
-              {name}
-            </div>
-          ))}
-        </div>
+      <div className="glass-panel text-center">
+        <h3 className="serif mb-2" style={{ color: 'var(--primary-blue)' }}>Ask the AI Planner ✨</h3>
+        <p className="subtitle" style={{ fontSize: '0.9rem', marginBottom: '15px', textTransform: 'none' }}>Need packing tips or local recommendations?</p>
+        <Link href="/chat" style={{ textDecoration: 'none' }}>
+          <button className="btn-secondary" style={{ width: '100%' }}>Chat with AI Planner</button>
+        </Link>
       </div>
     </div>
   );
