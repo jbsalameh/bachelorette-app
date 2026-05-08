@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const initialEvents = [
   { id: 1, day: "Thursday, June 11", time: "13:00", title: "Land at PMO & Drop Bags 🛬", desc: "Transfer ~35 min to old town." },
@@ -13,30 +13,51 @@ const initialEvents = [
   { id: 8, day: "Friday, June 12", time: "12:30", title: "Lido Maljk Beach Club 🏖️", desc: "Lunch on the sand and pool time." },
   { id: 9, day: "Friday, June 12", time: "21:30", title: "OVER Rooftop Bachelorette Dinner 🍣", desc: "Italian + sushi fusion, sophisticated cocktails." },
   { id: 10, day: "Friday, June 12", time: "00:00", title: "DJ Night in Mondello 🪩", desc: "Anima Mondello / Bagno Galatea open-air on the sand." },
+  { id: 11, day: "Saturday, June 13", time: "13:00", title: "Favignana Boat Tour ⛵", desc: "Private gozzo from Trapani port." },
+  { id: 12, day: "Sunday, June 14", time: "08:00", title: "Mondello Sunrise 🌅", desc: "Empty beach photos and coffee at Bar Galatea." }
 ];
 
 export default function Itinerary() {
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('bachelorette_events');
+    if (saved) {
+      setEvents(JSON.parse(saved));
+    } else {
+      setEvents(initialEvents);
+      localStorage.setItem('bachelorette_events', JSON.stringify(initialEvents));
+    }
+    setIsLoaded(true);
+  }, []);
+
+  const saveEvents = (newEvents) => {
+    setEvents(newEvents);
+    localStorage.setItem('bachelorette_events', JSON.stringify(newEvents));
+  };
+
+  const handleEdit = (id, field, value) => {
+    saveEvents(events.map(ev => ev.id === id ? { ...ev, [field]: value } : ev));
+  };
+
+  const handleDelete = (id) => {
+    saveEvents(events.filter(ev => ev.id !== id));
+  };
+
+  const handleAddEvent = (day) => {
+    const newId = events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1;
+    saveEvents([...events, { id: newId, day, time: "12:00", title: "New Event", desc: "" }]);
+  };
+
+  if (!isLoaded) return <div>Loading...</div>;
 
   const groupedEvents = events.reduce((acc, event) => {
     if (!acc[event.day]) acc[event.day] = [];
     acc[event.day].push(event);
     return acc;
   }, {});
-
-  const handleEdit = (id, field, value) => {
-    setEvents(events.map(ev => ev.id === id ? { ...ev, [field]: value } : ev));
-  };
-
-  const handleDelete = (id) => {
-    setEvents(events.filter(ev => ev.id !== id));
-  };
-
-  const handleAddEvent = (day) => {
-    const newId = Math.max(...events.map(e => e.id), 0) + 1;
-    setEvents([...events, { id: newId, day, time: "12:00", title: "New Event", desc: "" }]);
-  };
 
   return (
     <div>
@@ -50,17 +71,17 @@ export default function Itinerary() {
         </button>
       </div>
       
-      {Object.entries(groupedEvents).map(([day, dayEvents]) => (
+      {['Thursday, June 11', 'Friday, June 12', 'Saturday, June 13', 'Sunday, June 14'].map((day) => (
         <div key={day} className="glass-panel mb-4">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(0,0,0,0.05)', paddingBottom: '10px', marginBottom: '20px' }}>
             <h2 className="serif" style={{ color: 'var(--primary-blue)', margin: 0 }}>{day}</h2>
             {isEditing && (
-              <button onClick={() => handleAddEvent(day)} style={{ background: 'var(--ocean-blue)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', fontSize: '18px', cursor: 'pointer' }}>+</button>
+              <button onClick={() => handleAddEvent(day)} style={{ background: 'var(--ocean-blue)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
             )}
           </div>
           
           <div className="timeline">
-            {dayEvents.sort((a, b) => a.time.localeCompare(b.time)).map((ev) => (
+            {(groupedEvents[day] || []).sort((a, b) => a.time.localeCompare(b.time)).map((ev) => (
               <div key={ev.id} className="timeline-event">
                 {isEditing ? (
                   <div>
@@ -78,6 +99,9 @@ export default function Itinerary() {
                 )}
               </div>
             ))}
+            {!(groupedEvents[day] || []).length && (
+              <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>No events scheduled yet.</div>
+            )}
           </div>
         </div>
       ))}

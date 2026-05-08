@@ -1,10 +1,12 @@
 "use client";
 
 import { useChat } from 'ai/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
 export default function Chat() {
+  const [processedTools, setProcessedTools] = useState(new Set());
+  
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat();
   const messagesEndRef = useRef(null);
 
@@ -14,7 +16,36 @@ export default function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    
+    // Check for tool invocations
+    messages.forEach(m => {
+      if (m.toolInvocations) {
+        m.toolInvocations.forEach(toolInvocation => {
+          if (toolInvocation.toolName === 'addItineraryEvent' && !processedTools.has(toolInvocation.toolCallId)) {
+            // Process this tool call locally
+            const { day, time, title, desc } = toolInvocation.args;
+            
+            // Get existing events
+            let existingEvents = [];
+            const saved = localStorage.getItem('bachelorette_events');
+            if (saved) {
+              existingEvents = JSON.parse(saved);
+            }
+            
+            // Generate new ID
+            const newId = existingEvents.length > 0 ? Math.max(...existingEvents.map(e => e.id)) + 1 : 1;
+            
+            // Save to localStorage
+            const newEvents = [...existingEvents, { id: newId, day, time, title, desc }];
+            localStorage.setItem('bachelorette_events', JSON.stringify(newEvents));
+            
+            // Mark as processed
+            setProcessedTools(prev => new Set(prev).add(toolInvocation.toolCallId));
+          }
+        });
+      }
+    });
+  }, [messages, processedTools]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
@@ -30,27 +61,45 @@ export default function Chat() {
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: 'auto', marginBottom: 'auto' }}>
             <div style={{ fontSize: '40px', marginBottom: '10px' }}>🍋</div>
             <h3 className="serif" style={{ color: 'var(--primary-blue)' }}>Ask me anything!</h3>
-            <p>I can help with packing lists, Palermo recommendations, or Italian phrases.</p>
+            <p>I can help with packing lists, Palermo recommendations, or even schedule a new event for us!</p>
           </div>
         ) : (
           messages.map(m => (
-            <div key={m.id} style={{ 
-              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              background: m.role === 'user' ? 'var(--ocean-blue)' : 'white',
-              color: m.role === 'user' ? 'white' : 'var(--text-main)',
-              padding: '12px 16px',
-              borderRadius: '16px',
-              borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
-              borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
-              maxWidth: '85%',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-            }}>
-              <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '4px', fontWeight: 'bold' }}>
-                {m.role === 'user' ? 'You' : 'Planner ✨'}
+            <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ 
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                background: m.role === 'user' ? 'var(--ocean-blue)' : 'white',
+                color: m.role === 'user' ? 'white' : 'var(--text-main)',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
+                borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                maxWidth: '85%',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '4px', fontWeight: 'bold' }}>
+                  {m.role === 'user' ? 'You' : 'Planner ✨'}
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                  {m.content}
+                </div>
               </div>
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                {m.content}
-              </div>
+              
+              {/* Render Tool Invocations */}
+              {m.toolInvocations?.map(toolInvocation => (
+                <div key={toolInvocation.toolCallId} style={{ 
+                  alignSelf: 'flex-start', 
+                  background: 'var(--lemon-yellow)', 
+                  color: 'var(--primary-blue)',
+                  padding: '10px 14px', 
+                  borderRadius: '12px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  marginTop: '5px'
+                }}>
+                  ✅ Added "{toolInvocation.args.title}" to the itinerary for {toolInvocation.args.day}!
+                </div>
+              ))}
             </div>
           ))
         )}
@@ -67,7 +116,7 @@ export default function Chat() {
           className="input-field"
           style={{ margin: 0, flex: 1, background: 'white' }}
           value={input}
-          placeholder="Ask about Sicily..."
+          placeholder="Ask about Sicily or add an event..."
           onChange={handleInputChange}
           disabled={isLoading}
         />
