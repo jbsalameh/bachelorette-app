@@ -6,15 +6,18 @@ export const metadata = {
 import './globals.css';
 import Link from 'next/link';
 
+import ClientShell from '../components/ClientShell';
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <main className="app-container">
-          {children}
-        </main>
-        
-        <nav className="bottom-nav">
+        <ClientShell>
+          <main className="app-container">
+            {children}
+          </main>
+          
+          <nav className="bottom-nav">
           <Link href="/" className="nav-item active">
             <svg className="nav-icon" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
             Home
@@ -32,6 +35,7 @@ export default function RootLayout({ children }) {
             Finances
           </Link>
         </nav>
+        </ClientShell>
       </body>
     </html>
   )

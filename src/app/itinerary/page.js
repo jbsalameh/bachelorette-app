@@ -1,114 +1,136 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-
-const initialEvents = [
-  { id: 1, day: "Thursday, June 11", time: "13:00", title: "Land at PMO & Drop Bags 🛬", desc: "Transfer ~35 min to old town." },
-  { id: 2, day: "Thursday, June 11", time: "14:30", title: "Quick Lunch 🍕", desc: "Retrobottega di Prezzemolo & Vitale near Quattro Canti. Arancine + Sicilian white." },
-  { id: 3, day: "Thursday, June 11", time: "16:00", title: "Easy Walking Tour 📸", desc: "Quattro Canti → Cattedrale di Palermo (rooftop golden hour) → Teatro Massimo → Mercato del Capo." },
-  { id: 4, day: "Thursday, June 11", time: "19:00", title: "Sunset Aperitivo 🍹", desc: "Politeama Roof. Views over the city's domes." },
-  { id: 5, day: "Thursday, June 11", time: "21:00", title: "Dinner at Taverna Calderai 🍝", desc: "Medieval vaulted-stone interior, candlelit." },
-  { id: 6, day: "Thursday, June 11", time: "23:30", title: "Nightcap at Igiea Terrazza Bar 🥂", desc: "Old-money glam terrace over the marina. Early-ish bed." },
-  { id: 7, day: "Friday, June 12", time: "09:30", title: "Train to Cefalù 🚂", desc: "~1 hr from Palermo Centrale." },
-  { id: 8, day: "Friday, June 12", time: "12:30", title: "Lido Maljk Beach Club 🏖️", desc: "Lunch on the sand and pool time." },
-  { id: 9, day: "Friday, June 12", time: "21:30", title: "OVER Rooftop Bachelorette Dinner 🍣", desc: "Italian + sushi fusion, sophisticated cocktails." },
-  { id: 10, day: "Friday, June 12", time: "00:00", title: "DJ Night in Mondello 🪩", desc: "Anima Mondello / Bagno Galatea open-air on the sand." },
-  { id: 11, day: "Saturday, June 13", time: "13:00", title: "Favignana Boat Tour ⛵", desc: "Private gozzo from Trapani port." },
-  { id: 12, day: "Sunday, June 14", time: "08:00", title: "Mondello Sunrise 🌅", desc: "Empty beach photos and coffee at Bar Galatea." }
-];
+import { useState } from 'react';
+import { useItinerary } from '../components/ItineraryContext';
 
 export default function Itinerary() {
-  const [events, setEvents] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { events, updateEvent, deleteEvent } = useItinerary();
+  
+  const days = ['Thursday, June 11', 'Friday, June 12', 'Saturday, June 13', 'Sunday, June 14'];
+  const [activeDay, setActiveDay] = useState(days[0]);
+  
+  // Expanded card state (holds event id)
+  const [expandedId, setExpandedId] = useState(null);
+  
+  // Edit form state
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({ time: '', title: '', desc: '' });
 
-  useEffect(() => {
-    const saved = localStorage.getItem('bachelorette_events');
-    if (saved) {
-      setEvents(JSON.parse(saved));
-    } else {
-      setEvents(initialEvents);
-      localStorage.setItem('bachelorette_events', JSON.stringify(initialEvents));
-    }
-    setIsLoaded(true);
-  }, []);
+  const activeEvents = events.filter(e => e.day === activeDay).sort((a, b) => a.time.localeCompare(b.time));
 
-  const saveEvents = (newEvents) => {
-    setEvents(newEvents);
-    localStorage.setItem('bachelorette_events', JSON.stringify(newEvents));
+  const startEdit = (ev, e) => {
+    e.stopPropagation();
+    setEditId(ev.id);
+    setEditForm({ time: ev.time, title: ev.title, desc: ev.desc });
   };
 
-  const handleEdit = (id, field, value) => {
-    saveEvents(events.map(ev => ev.id === id ? { ...ev, [field]: value } : ev));
+  const saveEdit = (id) => {
+    updateEvent(id, editForm);
+    setEditId(null);
   };
-
-  const handleDelete = (id) => {
-    saveEvents(events.filter(ev => ev.id !== id));
-  };
-
-  const handleAddEvent = (day) => {
-    const newId = events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1;
-    saveEvents([...events, { id: newId, day, time: "12:00", title: "New Event", desc: "" }]);
-  };
-
-  if (!isLoaded) return <div>Loading...</div>;
-
-  const groupedEvents = events.reduce((acc, event) => {
-    if (!acc[event.day]) acc[event.day] = [];
-    acc[event.day].push(event);
-    return acc;
-  }, {});
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 className="title-large serif" style={{ margin: 0 }}>The Plan</h1>
-        <button 
-          className="btn-secondary" 
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          {isEditing ? "Save Plan ✅" : "Edit Plan ✏️"}
-        </button>
+      <h1 className="title-large serif mb-3 text-center">The Plan</h1>
+      
+      {/* Day Tabs */}
+      <div className="tabs-container mb-3" style={{ padding: '0 10px 15px' }}>
+        {days.map(day => {
+          const shortName = day.split(',')[0].substring(0, 3) + ' ' + day.split(' ')[2];
+          return (
+            <div 
+              key={day}
+              className={`pill-tab ${activeDay === day ? 'active' : ''}`}
+              onClick={() => { setActiveDay(day); setExpandedId(null); setEditId(null); }}
+            >
+              {shortName}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="glass-panel" style={{ minHeight: '50vh', padding: '16px' }}>
+        <h2 className="serif mb-3" style={{ color: 'var(--primary-blue)', paddingLeft: '8px' }}>{activeDay}</h2>
+        
+        {activeEvents.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🌴</div>
+            <p>No plans yet for today.<br/>Ask the AI Planner to schedule something!</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {activeEvents.map(ev => {
+              const isExpanded = expandedId === ev.id;
+              const isEditing = editId === ev.id;
+
+              return (
+                <div 
+                  key={ev.id} 
+                  className="card" 
+                  style={{ cursor: isEditing ? 'default' : 'pointer', margin: 0, transition: 'all 0.2s', background: isExpanded ? 'white' : 'rgba(255,255,255,0.7)', border: isExpanded ? '2px solid var(--ocean-blue)' : '1px solid rgba(0,0,0,0.05)' }}
+                  onClick={() => !isEditing && setExpandedId(isExpanded ? null : ev.id)}
+                >
+                  {isEditing ? (
+                    <div onClick={e => e.stopPropagation()}>
+                      <input className="input-field" type="time" value={editForm.time} onChange={e => setEditForm({...editForm, time: e.target.value})} />
+                      <input className="input-field" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} placeholder="Title" />
+                      <textarea className="input-field" value={editForm.desc} onChange={e => setEditForm({...editForm, desc: e.target.value})} rows="3" placeholder="Description" />
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <button className="btn-primary" style={{ margin: 0, padding: '10px', flex: 1 }} onClick={() => saveEdit(ev.id)}>Save</button>
+                        <button className="btn-secondary" style={{ margin: 0, padding: '10px' }} onClick={() => setEditId(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Collapsed Header */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <div style={{ width: '55px', fontWeight: '800', color: 'var(--sunset-orange)' }}>
+                          {ev.time}
+                        </div>
+                        <div style={{ flex: 1, fontWeight: '800', color: 'var(--primary-blue)', paddingRight: '10px' }}>
+                          {ev.title}
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>
+                          ›
+                        </div>
+                      </div>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(0,0,0,0.05)', animation: 'slideUp 0.2s ease-out forwards' }}>
+                          <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: 1.5, marginBottom: '16px' }}>
+                            {ev.desc}
+                          </p>
+                          
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {ev.mapQuery && (
+                              <a href={`https://maps.google.com/?q=${encodeURIComponent(ev.mapQuery)}`} target="_blank" rel="noopener noreferrer" className="chip" onClick={e => e.stopPropagation()}>
+                                📍 Map
+                              </a>
+                            )}
+                            {ev.phone && (
+                              <a href={`tel:${ev.phone}`} className="chip" onClick={e => e.stopPropagation()}>
+                                📞 Reserve
+                              </a>
+                            )}
+                            <button className="chip" style={{ background: 'transparent', border: '1px solid var(--text-muted)', color: 'var(--text-muted)' }} onClick={(e) => startEdit(ev, e)}>
+                              ✏️ Edit
+                            </button>
+                            <button className="chip" style={{ background: '#FFF0F5', borderColor: '#FF8FAB', color: '#D81159' }} onClick={(e) => { e.stopPropagation(); deleteEvent(ev.id); }}>
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
       
-      {['Thursday, June 11', 'Friday, June 12', 'Saturday, June 13', 'Sunday, June 14'].map((day) => (
-        <div key={day} className="glass-panel mb-4">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(0,0,0,0.05)', paddingBottom: '10px', marginBottom: '20px' }}>
-            <h2 className="serif" style={{ color: 'var(--primary-blue)', margin: 0 }}>{day}</h2>
-            {isEditing && (
-              <button onClick={() => handleAddEvent(day)} style={{ background: 'var(--ocean-blue)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-            )}
-          </div>
-          
-          <div className="timeline">
-            {(groupedEvents[day] || []).sort((a, b) => a.time.localeCompare(b.time)).map((ev) => (
-              <div key={ev.id} className="timeline-event">
-                {isEditing ? (
-                  <div>
-                    <input className="input-field" value={ev.time} onChange={(e) => handleEdit(ev.id, 'time', e.target.value)} type="time" style={{ width: '120px', marginBottom: '8px' }} />
-                    <input className="input-field" value={ev.title} onChange={(e) => handleEdit(ev.id, 'title', e.target.value)} placeholder="Event Title" />
-                    <textarea className="input-field" value={ev.desc} onChange={(e) => handleEdit(ev.id, 'desc', e.target.value)} placeholder="Description" rows="2" />
-                    <button onClick={() => handleDelete(ev.id)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ Delete Event</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="event-time">{ev.time}</div>
-                    <div className="event-title">{ev.title}</div>
-                    <div className="event-desc">{ev.desc}</div>
-                  </>
-                )}
-              </div>
-            ))}
-            {!(groupedEvents[day] || []).length && (
-              <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>No events scheduled yet.</div>
-            )}
-          </div>
-        </div>
-      ))}
-      
-      <div style={{ textAlign: 'center', marginBottom: '40px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-        End of Itinerary
-      </div>
     </div>
   );
 }
