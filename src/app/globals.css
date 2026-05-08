@@ -18,6 +18,19 @@
   --shadow-sm:   0 1px 4px rgba(13,27,62,0.06);
   --shadow-md:   0 4px 16px rgba(13,27,62,0.09);
   --shadow-lg:   0 12px 40px rgba(13,27,62,0.13);
+
+  /* ── Backward-compat aliases (keep old names working) ── */
+  --primary-blue:   var(--navy);
+  --ocean-blue:     var(--ocean);
+  --sky-blue:       var(--sky);
+  --sunset-orange:  var(--coral);
+  --lemon-yellow:   var(--lemon);
+  --accent-yellow:  var(--lemon);
+  --text-main:      var(--text);
+  --text-muted:     var(--muted);
+  --bg-color:       var(--cream);
+  --glass-bg:       rgba(255,255,255,0.88);
+  --glass-border:   rgba(13,27,62,0.08);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
