@@ -26,7 +26,7 @@ Trip overview:
 Prefer flat, walkable Palermo old town spots. Keep replies short, warm, emoji-rich. Celebrate every itinerary change!`;
 
     const { text, toolCalls } = await generateText({
-      model: google('gemini-2.0-flash-exp'),
+      model: google('gemini-1.5-flash'),
       system: systemPrompt,
       messages,
       maxSteps: 5,
@@ -81,7 +81,7 @@ Prefer flat, walkable Palermo old town spots. Keep replies short, warm, emoji-ri
   } catch (err) {
     console.error('Chat API error:', err);
     return Response.json(
-      { text: `Sorry, I couldn't connect right now. Make sure the GOOGLE_GENERATIVE_AI_API_KEY is set in your environment variables! 🔑`, toolCalls: [] },
+      { text: `⚠️ API Error: ${err.message}`, toolCalls: [], error: err.message },
       { status: 200 }
     );
   }

@@ -52,56 +52,60 @@ export default function AIChatOverlay() {
     setIsLoading(true);
 
     try {
+      // Strip extra fields — AI SDK only accepts { role, content }
+      const cleanMessages = updatedMessages.map(({ role, content }) => ({ role, content }));
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, currentEvents: events }),
+        body: JSON.stringify({ messages: cleanMessages, currentEvents: events }),
       });
 
-      const { text: aiText, toolCalls } = await res.json();
+      const data = await res.json();
 
-      // Apply any itinerary changes
-      applyTools(toolCalls);
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      applyTools(data.toolCalls);
 
       setMessages(prev => [
         ...prev,
-        { id: Date.now().toString(), role: 'assistant', content: aiText, toolCalls },
+        { id: Date.now().toString(), role: 'assistant', content: data.text, toolCalls: data.toolCalls || [] },
       ]);
     } catch (err) {
+      console.error('Chat error:', err);
       setMessages(prev => [
         ...prev,
-        { id: Date.now().toString(), role: 'assistant', content: '⚠️ Something went wrong. Make sure the Gemini API key is set!', toolCalls: [] },
+        { id: Date.now().toString(), role: 'assistant', content: `⚠️ Error: ${err.message}`, toolCalls: [] },
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const sendPrompt = (text) => {
-    setChatInput(text);
-    // Trigger send on next tick so state is updated
-    setTimeout(() => {
-      const userMsg = { id: Date.now().toString(), role: 'user', content: text };
-      setMessages(prev => {
-        const updated = [...prev, userMsg];
-        setIsLoading(true);
-        fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updated, currentEvents: events }),
+  const sendPrompt = (prompt) => {
+    const userMsg = { id: Date.now().toString(), role: 'user', content: prompt };
+    setMessages(prev => {
+      const updated = [...prev, userMsg];
+      const clean = updated.map(({ role, content }) => ({ role, content }));
+      setIsLoading(true);
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: clean, currentEvents: events }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          applyTools(data.toolCalls);
+          setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: data.text, toolCalls: data.toolCalls || [] }]);
         })
-          .then(r => r.json())
-          .then(({ text: aiText, toolCalls }) => {
-            applyTools(toolCalls);
-            setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: aiText, toolCalls }]);
-          })
-          .catch(() => {
-            setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: '⚠️ Error — check the API key!', toolCalls: [] }]);
-          })
-          .finally(() => { setIsLoading(false); setChatInput(''); });
-        return updated;
-      });
-    }, 10);
+        .catch(err => {
+          setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: `⚠️ Error: ${err.message}`, toolCalls: [] }]);
+        })
+        .finally(() => { setIsLoading(false); });
+      return updated;
+    });
   };
 
   const toolLabel = (tc) => {
