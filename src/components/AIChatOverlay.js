@@ -1,59 +1,115 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useChat } from '@ai-sdk/react';
+import { useState, useRef, useEffect } from 'react';
 import { useItinerary } from './ItineraryContext';
 
 export default function AIChatOverlay() {
   const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
-  const [processedTools, setProcessedTools] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(false);
   const { events, addEvent, updateEvent, deleteEvent, replaceDayEvents } = useItinerary();
-
-  const { messages, isLoading, append } = useChat({
-    api: '/api/chat',
-    body: { currentEvents: events },
-  });
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 300);
   }, [isOpen]);
 
-  // Process AI tool calls
-  useEffect(() => {
-    messages.forEach(m => {
-      (m.toolInvocations || []).forEach(tool => {
-        if (processedTools.has(tool.toolCallId)) return;
-        const a = tool.args;
-        try {
-          if (tool.toolName === 'addItineraryEvent')
-            addEvent({ day: a.day, time: a.time, title: a.title, desc: a.desc, mapQuery: a.mapQuery || '', phone: a.phone || '' });
-          else if (tool.toolName === 'updateItineraryEvent')
-            updateEvent(a.id, { time: a.time, title: a.title, desc: a.desc, mapQuery: a.mapQuery, phone: a.phone });
-          else if (tool.toolName === 'deleteItineraryEvent')
-            deleteEvent(a.id);
-          else if (tool.toolName === 'replaceItineraryDay')
-            replaceDayEvents(a.day, a.events);
-        } catch (e) {
-          console.error('Tool error', e);
-        }
-        setProcessedTools(prev => new Set(prev).add(tool.toolCallId));
-      });
+  // ── Apply tool calls to itinerary ────────────────────────────────────────
+  const applyTools = (toolCalls = []) => {
+    toolCalls.forEach(tc => {
+      const a = tc.args;
+      try {
+        if (tc.toolName === 'addItineraryEvent')
+          addEvent({ day: a.day, time: a.time, title: a.title, desc: a.desc, mapQuery: a.mapQuery || '', phone: a.phone || '' });
+        else if (tc.toolName === 'updateItineraryEvent')
+          updateEvent(a.id, { time: a.time, title: a.title, desc: a.desc, mapQuery: a.mapQuery, phone: a.phone });
+        else if (tc.toolName === 'deleteItineraryEvent')
+          deleteEvent(a.id);
+        else if (tc.toolName === 'replaceItineraryDay')
+          replaceDayEvents(a.day, a.events);
+      } catch (e) {
+        console.error('Tool apply error', e);
+      }
     });
-  }, [messages, processedTools, addEvent, updateEvent, deleteEvent, replaceDayEvents]);
+  };
 
-  const send = () => {
+  // ── Send message ─────────────────────────────────────────────────────────
+  const send = async () => {
     const text = chatInput.trim();
     if (!text || isLoading) return;
+
+    const userMsg = { id: Date.now().toString(), role: 'user', content: text };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setChatInput('');
-    append({ role: 'user', content: text });
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessages, currentEvents: events }),
+      });
+
+      const { text: aiText, toolCalls } = await res.json();
+
+      // Apply any itinerary changes
+      applyTools(toolCalls);
+
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'assistant', content: aiText, toolCalls },
+      ]);
+    } catch (err) {
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'assistant', content: '⚠️ Something went wrong. Make sure the Gemini API key is set!', toolCalls: [] },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendPrompt = (text) => {
+    setChatInput(text);
+    // Trigger send on next tick so state is updated
+    setTimeout(() => {
+      const userMsg = { id: Date.now().toString(), role: 'user', content: text };
+      setMessages(prev => {
+        const updated = [...prev, userMsg];
+        setIsLoading(true);
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: updated, currentEvents: events }),
+        })
+          .then(r => r.json())
+          .then(({ text: aiText, toolCalls }) => {
+            applyTools(toolCalls);
+            setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: aiText, toolCalls }]);
+          })
+          .catch(() => {
+            setMessages(m => [...m, { id: (Date.now() + 1).toString(), role: 'assistant', content: '⚠️ Error — check the API key!', toolCalls: [] }]);
+          })
+          .finally(() => { setIsLoading(false); setChatInput(''); });
+        return updated;
+      });
+    }, 10);
+  };
+
+  const toolLabel = (tc) => {
+    if (tc.toolName === 'addItineraryEvent')    return `✅ Added "${tc.args?.title}"`;
+    if (tc.toolName === 'updateItineraryEvent') return `✅ Updated event`;
+    if (tc.toolName === 'deleteItineraryEvent') return `🗑️ Removed event`;
+    if (tc.toolName === 'replaceItineraryDay')  return `🔄 Replaced ${tc.args?.day}`;
+    return '';
   };
 
   return (
@@ -90,7 +146,7 @@ export default function AIChatOverlay() {
                   <div style={{ fontSize: '48px', marginBottom: '12px' }}>🍋</div>
                   <h3 className="serif" style={{ color: 'var(--navy)', marginBottom: '8px' }}>Ciao Bella!</h3>
                   <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.5 }}>
-                    Ask me anything — packing tips, restaurant picks, or say the word and I'll update the itinerary!
+                    Ask me anything — packing tips, restaurant picks, or I'll update the itinerary for you!
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {[
@@ -98,8 +154,12 @@ export default function AIChatOverlay() {
                       ['Suggest a fun dinner in Palermo for Thursday 🍽️', 'Dinner Spots 🍽️'],
                       ['Add a morning coffee run on Friday ☕', 'Add Coffee Run ☕'],
                     ].map(([prompt, label]) => (
-                      <button key={label} className="chip" onClick={() => { append({ role: 'user', content: prompt }); }}
-                        style={{ width: '100%', justifyContent: 'center', padding: '12px 16px', fontSize: '0.9rem' }}>
+                      <button
+                        key={label}
+                        className="chip"
+                        onClick={() => sendPrompt(prompt)}
+                        style={{ width: '100%', justifyContent: 'center', padding: '12px 16px', fontSize: '0.9rem' }}
+                      >
                         {label}
                       </button>
                     ))}
@@ -107,7 +167,7 @@ export default function AIChatOverlay() {
                 </div>
               ) : (
                 messages.map(m => (
-                  <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{
                       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                       background: m.role === 'user' ? 'linear-gradient(135deg, var(--ocean), var(--navy))' : 'white',
@@ -118,27 +178,35 @@ export default function AIChatOverlay() {
                       borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
                       maxWidth: '85%',
                       fontSize: '0.92rem',
-                      lineHeight: 1.5,
+                      lineHeight: 1.55,
                       boxShadow: 'var(--shadow-sm)',
                     }}>
-                      <div style={{ fontSize: '0.72rem', opacity: 0.65, marginBottom: '4px', fontWeight: '700' }}>
+                      <div style={{ fontSize: '0.72rem', opacity: 0.65, marginBottom: '5px', fontWeight: '700' }}>
                         {m.role === 'user' ? 'You' : 'Bella ✨'}
                       </div>
                       <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
                     </div>
-                    {(m.toolInvocations || []).map(t => (
-                      <div key={t.toolCallId} style={{ alignSelf: 'flex-start', background: '#FEFCE8', color: '#854D0E', border: '1px solid #FDE68A', padding: '8px 14px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '700' }}>
-                        {t.toolName === 'addItineraryEvent'    && `✅ Added "${t.args?.title}"`}
-                        {t.toolName === 'updateItineraryEvent' && `✅ Updated event`}
-                        {t.toolName === 'deleteItineraryEvent' && `🗑️ Removed event`}
-                        {t.toolName === 'replaceItineraryDay'  && `🔄 Replaced ${t.args?.day}`}
+
+                    {/* Tool call badges */}
+                    {(m.toolCalls || []).map((tc, i) => (
+                      <div key={i} style={{
+                        alignSelf: 'flex-start', background: '#FEFCE8', color: '#854D0E',
+                        border: '1px solid #FDE68A', padding: '8px 14px',
+                        borderRadius: '12px', fontSize: '0.83rem', fontWeight: '700',
+                      }}>
+                        {toolLabel(tc)}
                       </div>
                     ))}
                   </div>
                 ))
               )}
+
               {isLoading && (
-                <div style={{ alignSelf: 'flex-start', background: 'white', padding: '11px 16px', borderRadius: '16px', borderBottomLeftRadius: '4px', color: 'var(--muted)', fontSize: '0.85rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{
+                  alignSelf: 'flex-start', background: 'white', padding: '11px 16px',
+                  borderRadius: '16px', borderBottomLeftRadius: '4px',
+                  color: 'var(--muted)', fontSize: '0.85rem', boxShadow: 'var(--shadow-sm)',
+                }}>
                   ✨ Thinking...
                 </div>
               )}
@@ -156,15 +224,10 @@ export default function AIChatOverlay() {
                 disabled={isLoading}
                 autoComplete="off"
                 style={{
-                  flex: 1,
-                  padding: '12px 16px',
-                  border: '2px solid var(--border)',
-                  borderRadius: '12px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '0.95rem',
-                  background: 'var(--cream)',
-                  color: 'var(--text)',
-                  outline: 'none',
+                  flex: 1, padding: '12px 16px',
+                  border: '2px solid var(--border)', borderRadius: '12px',
+                  fontFamily: 'Inter, sans-serif', fontSize: '0.95rem',
+                  background: 'var(--cream)', color: 'var(--text)', outline: 'none',
                 }}
                 onFocus={e => (e.target.style.borderColor = 'var(--ocean)')}
                 onBlur={e => (e.target.style.borderColor = 'var(--border)')}
