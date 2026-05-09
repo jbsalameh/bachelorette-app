@@ -1,10 +1,6 @@
 import { generateText, tool } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { google } from '@ai-sdk/google';
 import { z } from 'zod';
-
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
 
 export async function POST(req) {
   try {
@@ -26,7 +22,7 @@ Trip overview:
 Prefer flat, walkable Palermo old town spots. Keep replies short, warm, emoji-rich. Celebrate every itinerary change!`;
 
     const { text, toolCalls } = await generateText({
-      model: google('gemini-1.5-flash'),
+      model: google('gemini-2.5-flash'),
       system: systemPrompt,
       messages,
       maxSteps: 5,
